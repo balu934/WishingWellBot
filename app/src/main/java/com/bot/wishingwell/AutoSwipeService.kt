@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -23,7 +24,8 @@ class AutoSwipeService : AccessibilityService() {
     private var floatingView: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private var isAutoRunning = false
-    private var swipeDelay: Long = 400L // Default speed (milliseconds)
+    private var swipeDelay: Long = 300L
+    private var dragDuration: Long = 250L
 
     companion object {
         var instance: AutoSwipeService? = null
@@ -52,59 +54,57 @@ class AutoSwipeService : AccessibilityService() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 20
-            y = 150
+            y = 120
         }
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#DD000000"))
-            setPadding(14, 14, 14, 14)
+            setBackgroundColor(Color.parseColor("#E6111111"))
+            setPadding(16, 16, 16, 16)
         }
 
         val btnToggle = Button(this).apply {
             text = "START AUTO"
             textSize = 12f
-            setBackgroundColor(Color.parseColor("#4CAF50"))
+            setBackgroundColor(Color.parseColor("#2E7D32"))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 if (!isAutoRunning) {
                     isAutoRunning = true
                     text = "STOP AUTO"
-                    setBackgroundColor(Color.parseColor("#F44336"))
+                    setBackgroundColor(Color.parseColor("#C62828"))
                     startAutoLoop()
                 } else {
                     isAutoRunning = false
                     text = "START AUTO"
-                    setBackgroundColor(Color.parseColor("#4CAF50"))
+                    setBackgroundColor(Color.parseColor("#2E7D32"))
                     handler.removeCallbacksAndMessages(null)
                 }
             }
         }
 
-        // Left & Right controls
         val lrLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
         val btnLeft = Button(this).apply {
             text = "◀ Left"
-            textSize = 11f
+            textSize = 12f
             setOnClickListener { moveLeft() }
         }
         val btnRight = Button(this).apply {
             text = "Right ▶"
-            textSize = 11f
+            textSize = 12f
             setOnClickListener { moveRight() }
         }
         lrLayout.addView(btnLeft)
         lrLayout.addView(btnRight)
 
-        // Speed adjustment controls
         val speedText = TextView(this).apply {
-            text = "Speed: ${swipeDelay}ms"
+            text = "Delay: ${swipeDelay}ms"
             setTextColor(Color.YELLOW)
             textSize = 11f
             gravity = Gravity.CENTER
-            setPadding(0, 6, 0, 6)
+            setPadding(0, 4, 0, 4)
         }
 
         val speedLayout = LinearLayout(this).apply {
@@ -114,16 +114,16 @@ class AutoSwipeService : AccessibilityService() {
             text = "Fast (-)"
             textSize = 10f
             setOnClickListener {
-                if (swipeDelay > 150L) swipeDelay -= 50L
-                speedText.text = "Speed: ${swipeDelay}ms"
+                if (swipeDelay > 100L) swipeDelay -= 50L
+                speedText.text = "Delay: ${swipeDelay}ms"
             }
         }
         val btnSpeedUp = Button(this).apply {
             text = "Slow (+)"
             textSize = 10f
             setOnClickListener {
-                if (swipeDelay < 1000L) swipeDelay += 50L
-                speedText.text = "Speed: ${swipeDelay}ms"
+                if (swipeDelay < 800L) swipeDelay += 50L
+                speedText.text = "Delay: ${swipeDelay}ms"
             }
         }
         speedLayout.addView(btnSpeedDown)
@@ -147,30 +147,33 @@ class AutoSwipeService : AccessibilityService() {
                 moveRight()
                 handler.postDelayed({ startAutoLoop() }, swipeDelay)
             }
-        }, swipeDelay)
+        }, dragDuration + 50)
     }
 
     fun moveLeft() {
         val width = resources.displayMetrics.widthPixels.toFloat()
         val height = resources.displayMetrics.heightPixels.toFloat()
-        val yPos = height * 0.65f
-        performSwipe(width * 0.60f, yPos, width * 0.35f, yPos)
+        // బకెట్ ఉండే ఎత్తు సుమారు 60% ఎత్తులో ఉంటుంది
+        val yPos = height * 0.60f
+        // స్క్రీన్ మధ్య నుండి ఎడమ వైపుకు లాగడం
+        performDrag(width * 0.55f, yPos, width * 0.20f, yPos, dragDuration)
     }
 
     fun moveRight() {
         val width = resources.displayMetrics.widthPixels.toFloat()
         val height = resources.displayMetrics.heightPixels.toFloat()
-        val yPos = height * 0.65f
-        performSwipe(width * 0.40f, yPos, width * 0.65f, yPos)
+        val yPos = height * 0.60f
+        // స్క్రీన్ మధ్య నుండి కుడి వైపుకు లాగడం
+        performDrag(width * 0.45f, yPos, width * 0.80f, yPos, dragDuration)
     }
 
-    private fun performSwipe(startX: Float, startY: Float, endX: Float, endY: Float) {
+    private fun performDrag(startX: Float, startY: Float, endX: Float, endY: Float, duration: Long) {
         val path = Path().apply {
             moveTo(startX, startY)
             lineTo(endX, endY)
         }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
             .build()
 
         dispatchGesture(gesture, null, null)
@@ -189,5 +192,3 @@ class AutoSwipeService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 }
-
-        
