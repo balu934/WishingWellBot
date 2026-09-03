@@ -1,4 +1,3 @@
-
 package com.bot.wishingwell
 
 import android.accessibilityservice.AccessibilityService
@@ -16,6 +15,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.TextView
 
 class AutoSwipeService : AccessibilityService() {
 
@@ -23,6 +23,7 @@ class AutoSwipeService : AccessibilityService() {
     private var floatingView: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private var isAutoRunning = false
+    private var swipeDelay: Long = 400L // Default speed (milliseconds)
 
     companion object {
         var instance: AutoSwipeService? = null
@@ -50,18 +51,19 @@ class AutoSwipeService : AccessibilityService() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 50
-            y = 200
+            x = 20
+            y = 150
         }
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#CC000000"))
-            setPadding(16, 16, 16, 16)
+            setBackgroundColor(Color.parseColor("#DD000000"))
+            setPadding(14, 14, 14, 14)
         }
 
         val btnToggle = Button(this).apply {
             text = "START AUTO"
+            textSize = 12f
             setBackgroundColor(Color.parseColor("#4CAF50"))
             setTextColor(Color.WHITE)
             setOnClickListener {
@@ -79,19 +81,58 @@ class AutoSwipeService : AccessibilityService() {
             }
         }
 
+        // Left & Right controls
+        val lrLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
         val btnLeft = Button(this).apply {
             text = "◀ Left"
+            textSize = 11f
             setOnClickListener { moveLeft() }
         }
-
         val btnRight = Button(this).apply {
             text = "Right ▶"
+            textSize = 11f
             setOnClickListener { moveRight() }
         }
+        lrLayout.addView(btnLeft)
+        lrLayout.addView(btnRight)
+
+        // Speed adjustment controls
+        val speedText = TextView(this).apply {
+            text = "Speed: ${swipeDelay}ms"
+            setTextColor(Color.YELLOW)
+            textSize = 11f
+            gravity = Gravity.CENTER
+            setPadding(0, 6, 0, 6)
+        }
+
+        val speedLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val btnSpeedDown = Button(this).apply {
+            text = "Fast (-)"
+            textSize = 10f
+            setOnClickListener {
+                if (swipeDelay > 150L) swipeDelay -= 50L
+                speedText.text = "Speed: ${swipeDelay}ms"
+            }
+        }
+        val btnSpeedUp = Button(this).apply {
+            text = "Slow (+)"
+            textSize = 10f
+            setOnClickListener {
+                if (swipeDelay < 1000L) swipeDelay += 50L
+                speedText.text = "Speed: ${swipeDelay}ms"
+            }
+        }
+        speedLayout.addView(btnSpeedDown)
+        speedLayout.addView(btnSpeedUp)
 
         layout.addView(btnToggle)
-        layout.addView(btnLeft)
-        layout.addView(btnRight)
+        layout.addView(lrLayout)
+        layout.addView(speedText)
+        layout.addView(speedLayout)
 
         floatingView = layout
         windowManager?.addView(floatingView, layoutParams)
@@ -104,21 +145,23 @@ class AutoSwipeService : AccessibilityService() {
         handler.postDelayed({
             if (isAutoRunning) {
                 moveRight()
-                handler.postDelayed({ startAutoLoop() }, 600)
+                handler.postDelayed({ startAutoLoop() }, swipeDelay)
             }
-        }, 600)
+        }, swipeDelay)
     }
 
     fun moveLeft() {
         val width = resources.displayMetrics.widthPixels.toFloat()
         val height = resources.displayMetrics.heightPixels.toFloat()
-        performSwipe(width * 0.75f, height * 0.75f, width * 0.25f, height * 0.75f)
+        val yPos = height * 0.65f
+        performSwipe(width * 0.60f, yPos, width * 0.35f, yPos)
     }
 
     fun moveRight() {
         val width = resources.displayMetrics.widthPixels.toFloat()
         val height = resources.displayMetrics.heightPixels.toFloat()
-        performSwipe(width * 0.25f, height * 0.75f, width * 0.75f, height * 0.75f)
+        val yPos = height * 0.65f
+        performSwipe(width * 0.40f, yPos, width * 0.65f, yPos)
     }
 
     private fun performSwipe(startX: Float, startY: Float, endX: Float, endY: Float) {
@@ -127,7 +170,7 @@ class AutoSwipeService : AccessibilityService() {
             lineTo(endX, endY)
         }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 200))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
             .build()
 
         dispatchGesture(gesture, null, null)
@@ -146,3 +189,5 @@ class AutoSwipeService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 }
+
+        
