@@ -1,4 +1,4 @@
-package com.example.wishingwellbot
+package com.bot.wishingwell
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
@@ -145,3 +145,4 @@ class AutoSwipeService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 }
+
