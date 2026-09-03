@@ -1,3 +1,4 @@
+
 package com.bot.wishingwell
 
 import android.accessibilityservice.AccessibilityService
@@ -80,12 +81,12 @@ class AutoSwipeService : AccessibilityService() {
 
         val btnLeft = Button(this).apply {
             text = "◀ Left"
-            setOnClickListener { swipeLeft() }
+            setOnClickListener { moveLeft() }
         }
 
         val btnRight = Button(this).apply {
             text = "Right ▶"
-            setOnClickListener { swipeRight() }
+            setOnClickListener { moveRight() }
         }
 
         layout.addView(btnToggle)
@@ -99,22 +100,22 @@ class AutoSwipeService : AccessibilityService() {
     private fun startAutoLoop() {
         if (!isAutoRunning) return
 
-        swipeLeft()
+        moveLeft()
         handler.postDelayed({
             if (isAutoRunning) {
-                swipeRight()
+                moveRight()
                 handler.postDelayed({ startAutoLoop() }, 600)
             }
         }, 600)
     }
 
-    fun swipeLeft() {
+    fun moveLeft() {
         val width = resources.displayMetrics.widthPixels.toFloat()
         val height = resources.displayMetrics.heightPixels.toFloat()
         performSwipe(width * 0.75f, height * 0.75f, width * 0.25f, height * 0.75f)
     }
 
-    fun swipeRight() {
+    fun moveRight() {
         val width = resources.displayMetrics.widthPixels.toFloat()
         val height = resources.displayMetrics.heightPixels.toFloat()
         performSwipe(width * 0.25f, height * 0.75f, width * 0.75f, height * 0.75f)
@@ -145,4 +146,3 @@ class AutoSwipeService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 }
-
