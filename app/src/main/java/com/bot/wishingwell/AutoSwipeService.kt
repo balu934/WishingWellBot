@@ -10,7 +10,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -24,8 +23,8 @@ class AutoSwipeService : AccessibilityService() {
     private var floatingView: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private var isAutoRunning = false
-    private var swipeDelay: Long = 300L
-    private var dragDuration: Long = 250L
+    private var currentDirection = 0 // 0 = Left to Right, 1 = Right to Left
+    private var swipeDuration: Long = 350L // Drag Speed in ms
 
     companion object {
         var instance: AutoSwipeService? = null
@@ -59,7 +58,7 @@ class AutoSwipeService : AccessibilityService() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#E6111111"))
+            setBackgroundColor(Color.parseColor("#E6000000"))
             setPadding(16, 16, 16, 16)
         }
 
@@ -73,7 +72,7 @@ class AutoSwipeService : AccessibilityService() {
                     isAutoRunning = true
                     text = "STOP AUTO"
                     setBackgroundColor(Color.parseColor("#C62828"))
-                    startAutoLoop()
+                    runFullLoop()
                 } else {
                     isAutoRunning = false
                     text = "START AUTO"
@@ -83,91 +82,123 @@ class AutoSwipeService : AccessibilityService() {
             }
         }
 
-        val lrLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        val btnLeft = Button(this).apply {
-            text = "◀ Left"
-            textSize = 12f
-            setOnClickListener { moveLeft() }
-        }
-        val btnRight = Button(this).apply {
-            text = "Right ▶"
-            textSize = 12f
-            setOnClickListener { moveRight() }
-        }
-        lrLayout.addView(btnLeft)
-        lrLayout.addView(btnRight)
-
         val speedText = TextView(this).apply {
-            text = "Delay: ${swipeDelay}ms"
+            text = "Speed: ${swipeDuration}ms"
             setTextColor(Color.YELLOW)
-            textSize = 11f
+            textSize = 12f
             gravity = Gravity.CENTER
-            setPadding(0, 4, 0, 4)
+            setPadding(0, 6, 0, 6)
         }
 
         val speedLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
-        val btnSpeedDown = Button(this).apply {
-            text = "Fast (-)"
-            textSize = 10f
+        val btnFaster = Button(this).apply {
+            text = "⚡ Fast"
+            textSize = 11f
             setOnClickListener {
-                if (swipeDelay > 100L) swipeDelay -= 50L
-                speedText.text = "Delay: ${swipeDelay}ms"
+                if (swipeDuration > 150L) swipeDuration -= 50L
+                speedText.text = "Speed: ${swipeDuration}ms"
             }
         }
-        val btnSpeedUp = Button(this).apply {
-            text = "Slow (+)"
-            textSize = 10f
+        val btnSlower = Button(this).apply {
+            text = "🐢 Slow"
+            textSize = 11f
             setOnClickListener {
-                if (swipeDelay < 800L) swipeDelay += 50L
-                speedText.text = "Delay: ${swipeDelay}ms"
+                if (swipeDuration < 1000L) swipeDuration += 50L
+                speedText.text = "Speed: ${swipeDuration}ms"
             }
         }
-        speedLayout.addView(btnSpeedDown)
-        speedLayout.addView(btnSpeedUp)
+        speedLayout.addView(btnFaster)
+        speedLayout.addView(btnSlower)
+
+        val lrLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val btnLeft = Button(this).apply {
+            text = "◀ Full L"
+            textSize = 11f
+            setOnClickListener { fullSwipeLeft() }
+        }
+        val btnRight = Button(this).apply {
+            text = "Full R ▶"
+            textSize = 11f
+            setOnClickListener { fullSwipeRight() }
+        }
+        lrLayout.addView(btnLeft)
+        lrLayout.addView(btnRight)
 
         layout.addView(btnToggle)
-        layout.addView(lrLayout)
         layout.addView(speedText)
         layout.addView(speedLayout)
+        layout.addView(lrLayout)
 
         floatingView = layout
         windowManager?.addView(floatingView, layoutParams)
     }
 
-    private fun startAutoLoop() {
+    private fun runFullLoop() {
         if (!isAutoRunning) return
 
-        moveLeft()
-        handler.postDelayed({
-            if (isAutoRunning) {
-                moveRight()
-                handler.postDelayed({ startAutoLoop() }, swipeDelay)
+        val width = resources.displayMetrics.widthPixels.toFloat()
+        val height = resources.displayMetrics.heightPixels.toFloat()
+        val yPos = height * 0.60f
+
+        val startX: Float
+        val endX: Float
+
+        if (currentDirection == 0) {
+            // కుడి చివరి నుంచి ఎడమ చివరి వరకు (90% నుండి 10%)
+            startX = width * 0.90f
+            endX = width * 0.10f
+            currentDirection = 1
+        } else {
+            // ఎడమ చివరి నుంచి కుడి చివరి వరకు (10% నుండి 90%)
+            startX = width * 0.10f
+            endX = width * 0.90f
+            currentDirection = 0
+        }
+
+        val path = Path().apply {
+            moveTo(startX, yPos)
+            lineTo(endX, yPos)
+        }
+
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, swipeDuration))
+            .build()
+
+        dispatchGesture(gesture, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                super.onCompleted(gestureDescription)
+                if (isAutoRunning) {
+                    handler.postDelayed({ runFullLoop() }, 40)
+                }
             }
-        }, dragDuration + 50)
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                super.onCancelled(gestureDescription)
+                if (isAutoRunning) {
+                    handler.postDelayed({ runFullLoop() }, 40)
+                }
+            }
+        }, null)
     }
 
-    fun moveLeft() {
-        val width = resources.displayMetrics.widthPixels.toFloat()
-        val height = resources.displayMetrics.heightPixels.toFloat()
-        // బకెట్ ఉండే ఎత్తు సుమారు 60% ఎత్తులో ఉంటుంది
-        val yPos = height * 0.60f
-        // స్క్రీన్ మధ్య నుండి ఎడమ వైపుకు లాగడం
-        performDrag(width * 0.55f, yPos, width * 0.20f, yPos, dragDuration)
-    }
-
-    fun moveRight() {
+    fun fullSwipeLeft() {
         val width = resources.displayMetrics.widthPixels.toFloat()
         val height = resources.displayMetrics.heightPixels.toFloat()
         val yPos = height * 0.60f
-        // స్క్రీన్ మధ్య నుండి కుడి వైపుకు లాగడం
-        performDrag(width * 0.45f, yPos, width * 0.80f, yPos, dragDuration)
+        performSingleSwipe(width * 0.90f, yPos, width * 0.10f, yPos, swipeDuration)
     }
 
-    private fun performDrag(startX: Float, startY: Float, endX: Float, endY: Float, duration: Long) {
+    fun fullSwipeRight() {
+        val width = resources.displayMetrics.widthPixels.toFloat()
+        val height = resources.displayMetrics.heightPixels.toFloat()
+        val yPos = height * 0.60f
+        performSingleSwipe(width * 0.10f, yPos, width * 0.90f, yPos, swipeDuration)
+    }
+
+    private fun performSingleSwipe(startX: Float, startY: Float, endX: Float, endY: Float, duration: Long) {
         val path = Path().apply {
             moveTo(startX, startY)
             lineTo(endX, endY)
